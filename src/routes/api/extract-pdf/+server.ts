@@ -55,35 +55,38 @@ const isArea = (area: string) => {
 	return result;
 };
 
-const getIslandNames = (pages: Page[]) => {
+const getIslandNames = (line: string) => {
 	let islandNames: string[] = [];
-	pages.forEach((page) => {
-		page.lines.forEach((line) => {
 			let splittedRow = splitRow(line);
 			splittedRow.forEach((word) => {
 				if (isIslandName(word)) {
 					islandNames.push(word);
 				}
 			});
-		});
-	});
 
 	return Array.from(new Set(islandNames));
 };
 
-const getIslands = (names: string[], areas: Area[][], pages: Page[]) => {
+const getIslands = (pages: Page[]) => {
 	let islands: Island[] = [];
 
-	names.forEach((name, index) => {
-		const island: Island = {
-			name: name,
-			area: areas[index],
-			parcels: getParcels(pages, name)
-		};
+	pages.forEach((page) => {
 
+		page.lines.forEach((line) => {
+
+			const names = getIslandNames(line)
+			names.forEach((name, index) => {
+
+				const island: Island = {
+					name: name,
+					area: getIslandAreas(line)[index],
+					parcels: getParcels(pages, name)
+				};
 		islands.push(island);
-	});
 
+			});
+		});
+	});
 	return islands;
 };
 
@@ -130,11 +133,8 @@ const getParcels = (pages: Page[], name: string) => {
 	return arrayParcel;
 };
 
-const getIslandAreas = (pages: Page[]) => {
+const getIslandAreas = (line:string) => {
 	let islandAreas: Area[][] = [];
-
-	pages.forEach((page) => {
-		page.lines.forEach((line) => {
 			let splittedRow = splitRow(line);
 			splittedRow.forEach((word, index) => {
 				if (isIslandName(word) && isArea(splittedRow[index + 1])) {
@@ -147,8 +147,7 @@ const getIslandAreas = (pages: Page[]) => {
 					islandAreas.push(newArea);
 				}
 			});
-		});
-	});
+
 	return Array.from(new Set(islandAreas));
 };
 
@@ -156,9 +155,18 @@ export const POST: RequestHandler = async ({ request }) => {
 	const buffer = await request.arrayBuffer();
 	const pages = await getPages(buffer);
 	//	const result = await getIslands(pages);
-	const names = getIslandNames(pages);
-	const areas = getIslandAreas(pages);
-	const island = getIslands(names, areas, pages);
+	let names;
+	let areas;
+	pages.forEach((page) => {
+
+		page.lines.forEach((line) => {
+			names = getIslandNames(line);
+			areas = getIslandAreas(line);
+		});
+
+	});
+
+	const island = getIslands(pages);
 
 	return new Response(JSON.stringify(island));
 };
