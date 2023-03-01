@@ -57,96 +57,82 @@ const isArea = (area: string) => {
 
 const getIslandNames = (line: string) => {
 	let islandNames: string[] = [];
-			let splittedRow = splitRow(line);
-			splittedRow.forEach((word) => {
-				if (isIslandName(word)) {
-					islandNames.push(word);
-				}
-			});
+	let splittedRow = splitRow(line);
+	splittedRow.forEach((word) => {
+		if (isIslandName(word)) {
+			islandNames.push(word);
+		}
+	});
 
 	return Array.from(new Set(islandNames));
 };
 
 const getIslands = (pages: Page[]) => {
 	let islands: Island[] = [];
-
-	pages.forEach((page) => {
-
-		page.lines.forEach((line) => {
-
-			const names = getIslandNames(line)
-			names.forEach((name, index) => {
-
-				const island: Island = {
-					name: name,
-					area: getIslandAreas(line)[index],
-					parcels: getParcels(pages, name)
-				};
-		islands.push(island);
-
-			});
+	let flag = false;
+	pages.forEach((page, indexPage) => {
+		page.lines.forEach((line, indexLine) => {
+			if (!flag) {
+				const splittedRow = splitRow(line);
+				if (splittedRow[0] === 'Identificativo') {
+					console.log('enters');
+					flag = true;
+				} else {
+					const names = getIslandNames(line);
+					names.forEach((name, index) => {
+						const island: Island = {
+							name: name,
+							area: getIslandAreas(line)[index],
+							parcels: getParcels(pages, indexPage, indexLine + 1)
+						};
+						islands.push(island);
+					});
+				}
+			}
 		});
 	});
 	return islands;
 };
 
-const getParcels = (pages: Page[], name: string) => {
-	let flag = false;
-	let arrayParcel: Parcel[] = [];
-	//ciclo per ogni pagina
-	for (let j = 0; j < pages.length; j++) {
-		//ciclo per ogni riga
-		for (let k = 0; k < pages[j].lines.length; k++) {
-			let splittedRow = splitRow(pages[j].lines[k]);
-			if (!flag) {
-				//ciclo per ogni elemento della riga
-				for (let i = 0; i < splittedRow.length; i++) {
-					//trovo l'isola di interesse e faccio la ricerca a partire da dopo l'else
-					if (isIslandName(splittedRow[i])) {
-						if (splittedRow[i] === name) {
-							flag = true;
-							break;
-						}
-					}
-				}
-			} else {
-				//siccome le paricelle splittate hanno lunghezza 3, allora controllo se la lunghezza è 3
-				if (splittedRow.length === 3) {
-					let newParcel: Parcel = {
-						sheetNumber: Number(splittedRow[1]),
-						parcelNumber: Number(splittedRow[2])
-					};
-					arrayParcel.push(newParcel);
-				} else {
-					//controllo se l'elenco è finito
-					if (splittedRow[0] === 'Identificativo') {
-						return arrayParcel;
-					}
-					//controllo se c'è un isola successiva
-					if (isIslandName(splittedRow[0])) {
-						break;
-					}
-				}
-			}
+const test = () => {};
+const getParcels = (pages: Page[], indexPage: number, indexLine: number) => {
+	let parcel: Parcel[] = [];
+	//ciclo per ogni riga
+	for (let k = indexLine; k < pages[indexPage].lines.length; k++) {
+		let splittedRow = splitRow(pages[indexPage].lines[k]);
+
+		//siccome le paricelle splittate hanno lunghezza 3, allora controllo se la lunghezza è 3
+		if (splittedRow.length === 3) {
+			let newParcel: Parcel = {
+				sheetNumber: Number(splittedRow[1]),
+				parcelNumber: Number(splittedRow[2])
+			};
+			parcel.push(newParcel);
+		} else if (splittedRow[0] === 'Identificativo') {
+			//controllo se l'elenco è finito
+			return parcel;
+		} else {
+			break;
 		}
 	}
-	return arrayParcel;
+	return parcel;
 };
 
-const getIslandAreas = (line:string) => {
+const getIslandAreas = (line: string) => {
 	let islandAreas: Area[][] = [];
-			let splittedRow = splitRow(line);
-			splittedRow.forEach((word, index) => {
-				if (isIslandName(word) && isArea(splittedRow[index + 1])) {
-					let area = splittedRow[index + 1].split(',');
-					let newArea: Area[] = [
-						{ value: Number(area[0]), unit: 'Ha' },
-						{ value: Number(area[1]), unit: 'Aa' },
-						{ value: Number(area[2]), unit: 'Ca' }
-					];
-					islandAreas.push(newArea);
-				}
-			});
+	let splittedRow = splitRow(line);
+
+	splittedRow.forEach((word, index) => {
+		if (isIslandName(word) && isArea(splittedRow[index + 1])) {
+			let area = splittedRow[index + 1].split(',');
+			let newArea: Area[] = [
+				{ value: Number(area[0]), unit: 'Ha' },
+				{ value: Number(area[1]), unit: 'Aa' },
+				{ value: Number(area[2]), unit: 'Ca' }
+			];
+			islandAreas.push(newArea);
+		}
+	});
 
 	return Array.from(new Set(islandAreas));
 };
@@ -154,18 +140,6 @@ const getIslandAreas = (line:string) => {
 export const POST: RequestHandler = async ({ request }) => {
 	const buffer = await request.arrayBuffer();
 	const pages = await getPages(buffer);
-	//	const result = await getIslands(pages);
-	let names;
-	let areas;
-	pages.forEach((page) => {
-
-		page.lines.forEach((line) => {
-			names = getIslandNames(line);
-			areas = getIslandAreas(line);
-		});
-
-	});
-
 	const island = getIslands(pages);
 
 	return new Response(JSON.stringify(island));
